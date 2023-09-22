@@ -7,15 +7,16 @@ LDFLAGS=-ldflags "-s -X main.gitRevision=$(GIT_REVISION) -X main.gitBranch=$(GIT
 
 .PHONY: clean
 clean:
+	[ -d dist ] || mkdir dist
 	rm -rf dist/* || true
 
 .PHONY: dep
 dep:
 	go mod tidy
 
-.PHONY: protoc
-protoc:
-	protoc -I=./protobuf --go_out=./cotproto --go_opt=module=github.com/kdudkov/goatak/cotproto ./protobuf/*.proto
+.PHONE: update
+update:
+	rm go.sum; go get -u ./...
 
 .PHONY: checkdep
 checkdep:
@@ -27,10 +28,8 @@ test:
 
 .PHONY: build
 build: clean dep
-	[ -d dist ] || mkdir dist
 	go build $(LDFLAGS) -o dist/ .
 
 .PHONY: gox
 gox: clean dep
-	[ -d dist ] || mkdir dist
 	GOARM=5 gox --osarch="linux/amd64 windows/amd64 darwin/arm64" -output "dist/{{.OS}}_{{.Arch}}/{{.Dir}}" $(LDFLAGS) .

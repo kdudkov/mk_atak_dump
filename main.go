@@ -9,8 +9,8 @@ import (
 	"log"
 	"net"
 
-	"github.com/kdudkov/goatak/cot"
-	"github.com/kdudkov/goatak/cotproto"
+	"github.com/kdudkov/goatak/pkg/cot"
+	"github.com/kdudkov/goatak/pkg/cotproto"
 )
 
 const (
