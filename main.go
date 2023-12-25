@@ -5,9 +5,10 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
-	"google.golang.org/protobuf/proto"
 	"log"
 	"net"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/kdudkov/goatak/pkg/cot"
 	"github.com/kdudkov/goatak/pkg/cotproto"
@@ -20,6 +21,49 @@ const (
 	maxDatagramSize       = 8192
 	magicByte             = 0xbf
 )
+
+func ListenIf(ifi *net.Interface, addr *net.UDPAddr, ch chan *cotproto.TakMessage) {
+	conn, err := net.ListenMulticastUDP("udp", ifi, addr)
+	if err != nil {
+		return
+	}
+
+	_ = conn.SetReadBuffer(maxDatagramSize)
+	buf := make([]byte, maxDatagramSize)
+
+	for {
+		n, _, err := conn.ReadFromUDP(buf)
+		if err != nil {
+			log.Fatal("ReadFromUDP failed:", err)
+		}
+
+		if n < 4 {
+			continue
+		}
+
+		if buf[0] == magicByte && buf[2] == magicByte {
+			if buf[1] == 1 {
+				msg := new(cotproto.TakMessage)
+				err = proto.Unmarshal(buf[3:n], msg)
+				if err != nil {
+					fmt.Println(err.Error())
+					continue
+				}
+				ch <- msg
+			} else {
+				ev := &cot.Event{}
+				err = xml.Unmarshal(buf[3:n], ev)
+				if err != nil {
+					fmt.Println(err.Error())
+					continue
+				}
+
+				msg, _ := cot.EventToProto(ev)
+				ch <- msg.TakMessage
+			}
+		}
+	}
+}
 
 func main() {
 	ifName := flag.String("interface", "", "interface")
@@ -60,49 +104,6 @@ func main() {
 		b, err := json.Marshal(msg)
 		if err == nil {
 			fmt.Println(string(b))
-		}
-	}
-}
-
-func ListenIf(ifi *net.Interface, addr *net.UDPAddr, ch chan *cotproto.TakMessage) {
-	conn, err := net.ListenMulticastUDP("udp", ifi, addr)
-	if err != nil {
-		return
-	}
-
-	_ = conn.SetReadBuffer(maxDatagramSize)
-	buf := make([]byte, maxDatagramSize)
-
-	for {
-		n, _, err := conn.ReadFromUDP(buf)
-		if err != nil {
-			log.Fatal("ReadFromUDP failed:", err)
-		}
-
-		if n < 4 {
-			continue
-		}
-
-		if buf[0] == magicByte && buf[2] == magicByte {
-			if buf[1] == 1 {
-				msg := new(cotproto.TakMessage)
-				err = proto.Unmarshal(buf[3:n], msg)
-				if err != nil {
-					fmt.Println(err.Error())
-					continue
-				}
-				ch <- msg
-			} else {
-				ev := &cot.Event{}
-				err = xml.Unmarshal(buf[3:n], ev)
-				if err != nil {
-					fmt.Println(err.Error())
-					continue
-				}
-
-				msg, _ := cot.EventToProto(ev)
-				ch <- msg
-			}
 		}
 	}
 }
