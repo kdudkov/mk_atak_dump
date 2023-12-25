@@ -22,6 +22,11 @@ const (
 	magicByte             = 0xbf
 )
 
+var (
+	gitRevision = "unknown"
+	gitBranch   = "unknown"
+)
+
 func ListenIf(ifi *net.Interface, addr *net.UDPAddr, ch chan *cotproto.TakMessage) {
 	conn, err := net.ListenMulticastUDP("udp", ifi, addr)
 	if err != nil {
@@ -65,9 +70,29 @@ func ListenIf(ifi *net.Interface, addr *net.UDPAddr, ch chan *cotproto.TakMessag
 	}
 }
 
+func getVersion() string {
+	if gitBranch != "master" && gitBranch != "unknown" {
+		return fmt.Sprintf("%s:%s", gitBranch, gitRevision)
+	}
+
+	return gitRevision
+}
+
 func main() {
+	version := flag.Bool("version", false, "show version")
 	ifName := flag.String("interface", "", "interface")
+	ver := flag.String("ver", "2", "version (1 or 2)")
 	flag.Parse()
+
+	if *version {
+		fmt.Println(getVersion())
+		return
+	}
+
+	if *ver != "1" && *ver != "2" {
+		fmt.Println("version must be 1 or 2")
+		return
+	}
 
 	addr, err := net.ResolveUDPAddr("udp", saMulticastAddr)
 	if err != nil {
@@ -101,9 +126,23 @@ func main() {
 	}
 
 	for msg := range ch {
-		b, err := json.Marshal(msg)
-		if err == nil {
-			fmt.Println(string(b))
+		switch *ver {
+		case "1":
+			msg1 := cot.ProtoToEvent(msg)
+			b, err := xml.Marshal(msg1)
+			if err == nil {
+				fmt.Println(string(b))
+			} else {
+				fmt.Println(err)
+			}
+
+		case "2":
+			b, err := json.Marshal(msg)
+			if err == nil {
+				fmt.Println(string(b))
+			} else {
+				fmt.Println(err)
+			}
 		}
 	}
 }
